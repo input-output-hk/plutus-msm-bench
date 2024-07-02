@@ -1,26 +1,53 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main where
 
-import AuctionValidator
-import Data.ByteString qualified as B
-import Data.ByteString.Base16 qualified as Base16
-import Data.ByteString.Short qualified as B
-import PlutusLedgerApi.V2 qualified as V2
+import Control.Lens (Bifunctor (bimap), traverseOf, (^.))
+import Control.Monad.Except (runExceptT)
+import MSM
 
+import PlutusCore qualified as PLC
+import PlutusCore.Evaluation.Machine.ExBudget (ExBudget)
+
+import PlutusCore.Evaluation.Machine.ExBudgetingDefaults qualified as PLC
+import PlutusTx (
+    CompiledCode,
+    getPlcNoAnn,
+ )
+import UntypedPlutusCore qualified as UPLC
+import UntypedPlutusCore.Evaluation.Machine.Cek qualified as UPLC
+
+data Error
+    = FreeVariableError
+    | EvaluationError (UPLC.CekEvaluationException UPLC.Name UPLC.DefaultUni UPLC.DefaultFun) ExBudget
+    deriving (Show)
+
+evalWithBudget :: CompiledCode a -> Either Main.Error ExBudget
+evalWithBudget compiledCode =
+    let programE =
+            PLC.runQuote $
+                runExceptT @PLC.FreeVariableError $
+                    traverseOf UPLC.progTerm UPLC.unDeBruijnTerm $
+                        getPlcNoAnn compiledCode
+     in case programE of
+            Left _ -> Left FreeVariableError
+            Right program ->
+                let (result, UPLC.TallyingSt _ budget) =
+                        UPLC.runCekNoEmit
+                            PLC.defaultCekParametersForTesting
+                            UPLC.tallying
+                            $ program ^. UPLC.progTerm
+                 in bimap (`EvaluationError` budget) (const budget) result
+
+evalWithBudget' :: CompiledCode () -> Either Error ExBudget
+evalWithBudget' = evalWithBudget
 
 main :: IO ()
-main = B.writeFile "validator.uplc" . Base16.encode $ B.fromShort serialisedScript
-  where
-    script = auctionValidatorScript params
-    serialisedScript = V2.serialiseCompiledCode script
-    params =
-        AuctionParams
-            { apSeller = V2.PubKeyHash "addr_test1vqe09nt0rxgwn83upxuhqzs4aqrzdjqmhrh5l4g5hh4kc6qsncmku"
-            , -- The asset to be auctioned is 10000 lovelaces
-              apAsset = V2.singleton V2.adaSymbol V2.adaToken 10000
-            , -- The minimum bid is 100 lovelaces
-              apMinBid = 100
-            , apEndTime = 4102416000000 -- 01/01/2100
-            }
+main = do
+    case evalWithBudget' appliedCompiled of
+        Left e ->
+            putStrLn $ "Fail: " <> show e
+        Right budget ->
+            putStrLn $ "Resources used: " <> show budget
