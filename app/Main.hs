@@ -6,16 +6,19 @@ module Main where
 
 import Control.Lens (Bifunctor (bimap), traverseOf, (^.))
 import Control.Monad.Except (runExceptT)
+import Data.ByteString
+import Flat (flat)
 import MSM
-
 import PlutusCore qualified as PLC
 import PlutusCore.Evaluation.Machine.ExBudget (ExBudget)
+import UntypedPlutusCore (UnrestrictedProgram (UnrestrictedProgram))
 
 import PlutusCore.Evaluation.Machine.ExBudgetingDefaults qualified as PLC
 import PlutusTx (
     CompiledCode,
     getPlcNoAnn,
  )
+import PlutusTx.Prelude (BuiltinBLS12_381_G1_Element)
 import UntypedPlutusCore qualified as UPLC
 import UntypedPlutusCore.Evaluation.Machine.Cek qualified as UPLC
 
@@ -41,12 +44,16 @@ evalWithBudget compiledCode =
                             $ program ^. UPLC.progTerm
                  in bimap (`EvaluationError` budget) (const budget) result
 
-evalWithBudget' :: CompiledCode () -> Either Error ExBudget
-evalWithBudget' = evalWithBudget
+-- this dumps contract to file to get profiling data
+writeToFile :: IO ()
+writeToFile =
+    Data.ByteString.writeFile "MSM.flat" . flat . UnrestrictedProgram <$> PlutusTx.getPlcNoAnn $
+        appliedCompiled
 
 main :: IO ()
 main = do
-    case evalWithBudget' appliedCompiled of
+    writeToFile
+    case evalWithBudget appliedCompiled of
         Left e ->
             putStrLn $ "Fail: " <> show e
         Right budget ->

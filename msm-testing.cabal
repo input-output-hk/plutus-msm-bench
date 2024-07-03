@@ -25,5 +25,6 @@ executable msm-testing
     , time
     , mtl
     , lens
+    , flat
 
   other-modules:    MSM
