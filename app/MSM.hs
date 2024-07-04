@@ -53,20 +53,8 @@ calculateMSM scalars points =
 wrapMSM :: [Integer] -> [PlutusTx.BuiltinByteString] -> PlutusTx.BuiltinByteString
 wrapMSM s p = bls12_381_G1_compress (calculateMSM s (PlutusTx.map (\e -> bls12_381_G1_uncompress e) p))
 
-decompressed_g :: BuiltinBLS12_381_G1_Element
-decompressed_g = (bls12_381_G1_uncompress bls12_381_G1_compressed_generator)
-
-decompressed_z :: BuiltinBLS12_381_G1_Element
-decompressed_z = (bls12_381_G1_uncompress bls12_381_G1_compressed_zero)
-
-scalars_e :: [Integer]
-scalars_e = [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]
-
-points_e :: [BuiltinBLS12_381_G1_Element]
-points_e = [decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g, decompressed_g]
-
-appliedCompiled :: CompiledCode PlutusTx.BuiltinByteString
-appliedCompiled =
+appliedCompiled :: [Integer] -> [BuiltinBLS12_381_G1_Element] -> CompiledCode PlutusTx.BuiltinByteString
+appliedCompiled scalars points =
     $$(PlutusTx.compile [||wrapMSM||])
-        `PlutusTx.unsafeApplyCode` PlutusTx.liftCodeDef scalars_e
-        `PlutusTx.unsafeApplyCode` PlutusTx.liftCodeDef (PlutusTx.map (\e -> bls12_381_G1_compress e)  points_e)
+        `PlutusTx.unsafeApplyCode` PlutusTx.liftCodeDef scalars
+        `PlutusTx.unsafeApplyCode` PlutusTx.liftCodeDef (PlutusTx.map (\e -> bls12_381_G1_compress e) points)

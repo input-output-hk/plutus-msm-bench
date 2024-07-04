@@ -4,3 +4,6 @@ validator.uplc
 cabal.project.freeze
 result
 .idea
+*.flat
+*.svg
+logs

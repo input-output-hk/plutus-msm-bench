@@ -26,5 +26,6 @@ executable msm-testing
     , mtl
     , lens
     , flat
+    , random
 
   other-modules:    MSM
