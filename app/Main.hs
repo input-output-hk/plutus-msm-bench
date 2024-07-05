@@ -78,7 +78,7 @@ generateInputs n =
 
 main :: IO ()
 main = do
-    let testCases = [10, 30, 50, 80, 100, 300, 500, 800, 1000]
+    let testCases = [10, 30, 50, 80, 100, 129, 130, 300, 500, 800, 1000]
     let inputData = Prelude.map (\e -> generateInputs e) testCases
     let functions = Prelude.map (\(s, g) -> appliedCompiled s g) inputData
     let executed =
